@@ -160,6 +160,10 @@ impl HelpWidget {
                         desc: "Collapse current repository",
                     },
                     HelpLine {
+                        key: "H/L",
+                        desc: "Collapse/expand all groups",
+                    },
+                    HelpLine {
                         key: "x",
                         desc: "Run custom action on notification(s)",
                     },

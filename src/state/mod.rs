@@ -403,6 +403,24 @@ impl AppState {
         }
     }
 
+    /// Collapse or expand every repository and organisation at once.
+    pub fn set_all_expanded(&mut self, expanded: bool) {
+        if expanded {
+            self.expanded_repos.clear();
+            self.expanded_orgs.clear();
+        } else {
+            self.collapse_all_repos();
+            for n in &self.notifications {
+                self.expanded_orgs
+                    .insert(n.repository.owner.login.clone(), false);
+            }
+        }
+        self.build_tree();
+        if !self.tree_items.is_empty() {
+            self.selected_index = self.selected_index.min(self.tree_items.len() - 1);
+        }
+    }
+
     pub fn selected_notification(&self) -> Option<&Notification> {
         self.tree_items
             .get(self.selected_index)

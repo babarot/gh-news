@@ -3134,6 +3134,8 @@ impl App {
                     self.state.toggle_repo_expansion(&repo_name);
                 }
             }
+            KeyCode::Char('H') => self.state.set_all_expanded(false),
+            KeyCode::Char('L') => self.state.set_all_expanded(true),
             KeyCode::Left | KeyCode::Char('h') => {
                 // Collapse org if on an org header
                 if let Some(org_name) = self.state.selected_org() {
