@@ -139,7 +139,7 @@ impl ListWidget {
                             .unwrap_or(true);
 
                         line.push(Span::styled(
-                            "󰊻 ",
+                            if org_info.is_user { "\u{f007} " } else { "󰊻 " },
                             if is_selected {
                                 Style::default().fg(self.theme.highlight_fg)
                             } else {

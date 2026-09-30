@@ -22,6 +22,7 @@ pub enum OrgGroupingMode {
 pub struct OrgHeaderInfo {
     pub login: String,
     pub notification_count: usize,
+    pub is_user: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
