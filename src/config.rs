@@ -211,6 +211,7 @@ pub struct Config {
     pub groups_collapsed: bool,
     pub org_grouping: OrgGroupingMode,
     pub list_layout: ListLayout,
+    pub click_to_zoom: bool,
 
     // Behaviour
     pub auto_mark_read: bool,
@@ -316,6 +317,7 @@ impl Default for Config {
             groups_collapsed: false,
             org_grouping: OrgGroupingMode::default(),
             list_layout: ListLayout::default(),
+            click_to_zoom: true,
             auto_mark_read: false,
             auto_mark_read_delay_ms: 400,
             auto_archive: false,
@@ -584,6 +586,13 @@ priority = 1
             [ResolvedReviewState::Merged, ResolvedReviewState::Approved]
         );
         assert!(toml::from_str::<Config>(r#"hide_resolved_review_requests = ["mreged"]"#).is_err());
+    }
+
+    #[test]
+    fn test_click_to_zoom_defaults_on() {
+        assert!(toml::from_str::<Config>("").unwrap().click_to_zoom);
+        let config: Config = toml::from_str("click_to_zoom = false").unwrap();
+        assert!(!config.click_to_zoom);
     }
 
     #[test]

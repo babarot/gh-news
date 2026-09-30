@@ -4112,31 +4112,17 @@ impl App {
                             }
                         } else {
                             // Clicked outside list items (on borders/padding) - toggle zoom
-                            if self.state.focused_pane == PaneFocus::Pane1 {
-                                self.state.focused_pane = PaneFocus::None;
-                            } else {
-                                self.state.focused_pane = PaneFocus::Pane1;
-                            }
+                            self.toggle_zoom_on_click(PaneFocus::Pane1);
                         }
                     } else {
                         // Clicked outside list area or on borders - toggle zoom
-                        if self.state.focused_pane == PaneFocus::Pane1 {
-                            self.state.focused_pane = PaneFocus::None;
-                        } else {
-                            self.state.focused_pane = PaneFocus::Pane1;
-                        }
+                        self.toggle_zoom_on_click(PaneFocus::Pane1);
                     }
                 }
                 PaneFocus::Pane2 => {
                     // Only allow focusing Pane2 if preview is enabled
                     if self.state.show_preview() {
-                        if self.state.focused_pane == PaneFocus::Pane2 {
-                            // Already focused, zoom out
-                            self.state.focused_pane = PaneFocus::None;
-                        } else {
-                            // Focus Pane2
-                            self.state.focused_pane = PaneFocus::Pane2;
-                        }
+                        self.toggle_zoom_on_click(PaneFocus::Pane2);
                     }
                 }
                 PaneFocus::None => {
@@ -4145,6 +4131,19 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// Zoom a pane to full screen, or back to the split view when it already
+    /// is; clicks do nothing when `click_to_zoom` is off (1/2 still work).
+    fn toggle_zoom_on_click(&mut self, pane: PaneFocus) {
+        if !self.config.click_to_zoom {
+            return;
+        }
+        self.state.focused_pane = if self.state.focused_pane == pane {
+            PaneFocus::None
+        } else {
+            pane
+        };
     }
 
     fn handle_mouse_scroll(

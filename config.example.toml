@@ -175,6 +175,12 @@ org_grouping = "auto"
 # Default: "right_aligned"
 # list_layout = "right_aligned"
 
+# Clicking the preview, or the list outside its rows, zooms that pane to
+# full screen and clicking again restores the split view. Set to false to
+# keep clicks from zooming; 1, 2 and Esc still do.
+# Default: true
+# click_to_zoom = true
+
 # ==============================================================================
 # BEHAVIOR
 # ==============================================================================
