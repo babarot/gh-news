@@ -46,6 +46,7 @@ pub struct AppState {
     pub expanded_repos: HashMap<String, bool>, // Track which repos are expanded
     pub expanded_orgs: HashMap<String, bool>, // Track which orgs are expanded
     pub org_grouping: OrgGroupingMode,
+    pub hidden_review_states: Vec<crate::config::ResolvedReviewState>,
     pub selected_index: usize,
     pub filter: Option<Filter>,
     pub preview_mode: PreviewMode,
@@ -185,6 +186,7 @@ impl AppState {
             expanded_repos: HashMap::new(),
             expanded_orgs: HashMap::new(),
             org_grouping: OrgGroupingMode::default(),
+            hidden_review_states: Vec::new(),
             selected_index: 0,
             filter: None,
             preview_mode: PreviewMode::Vertical, // Preview open by default
@@ -300,7 +302,9 @@ impl AppState {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, n)| {
-                    if self.snoozed_ids.contains_key(&n.id) {
+                    if self.snoozed_ids.contains_key(&n.id)
+                        || n.is_resolved_review_request(&self.hidden_review_states)
+                    {
                         return None;
                     }
                     if filter.matches(n) {
@@ -316,7 +320,9 @@ impl AppState {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, n)| {
-                    if self.snoozed_ids.contains_key(&n.id) {
+                    if self.snoozed_ids.contains_key(&n.id)
+                        || n.is_resolved_review_request(&self.hidden_review_states)
+                    {
                         None
                     } else {
                         Some(i)

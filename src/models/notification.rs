@@ -1,3 +1,4 @@
+use crate::config::ResolvedReviewState;
 use crate::models::{NotificationReason, NotificationType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,17 @@ pub struct Notification {
 impl Notification {
     pub fn is_unread(&self) -> bool {
         self.unread
+    }
+
+    /// A review request on a pull request that has reached one of `states`,
+    /// so it no longer needs this review.
+    pub fn is_resolved_review_request(&self, states: &[ResolvedReviewState]) -> bool {
+        self.reason_enum() == NotificationReason::ReviewRequested
+            && self.notification_type() == NotificationType::PullRequest
+            && self
+                .context
+                .as_deref()
+                .is_some_and(|ctx| states.iter().any(|s| s.context() == ctx))
     }
 
     pub fn notification_type(&self) -> NotificationType {
@@ -606,6 +618,37 @@ mod tests {
         n.author = author.map(String::from);
         n.context = context.map(String::from);
         n
+    }
+
+    #[test]
+    fn resolved_review_request_needs_a_pr_in_a_listed_state() {
+        use ResolvedReviewState::*;
+        let all = [Merged, Closed, Approved];
+        let pr = NotificationType::PullRequest;
+        let n = make_reason_notification("review_requested", pr, None, Some("approved"));
+        assert!(!n.is_resolved_review_request(&[Merged, Closed]));
+        assert!(!n.is_resolved_review_request(&[]));
+        for (reason, ntype, context, resolved) in [
+            ("review_requested", pr, Some("merged"), true),
+            ("review_requested", pr, Some("closed"), true),
+            ("review_requested", pr, Some("approved"), true),
+            ("review_requested", pr, Some("open"), false),
+            ("review_requested", pr, None, false),
+            ("author", pr, Some("merged"), false),
+            (
+                "review_requested",
+                NotificationType::Issue,
+                Some("closed"),
+                false,
+            ),
+        ] {
+            let n = make_reason_notification(reason, ntype, None, context);
+            assert_eq!(
+                n.is_resolved_review_request(&all),
+                resolved,
+                "{reason} {context:?}"
+            );
+        }
     }
 
     #[test]

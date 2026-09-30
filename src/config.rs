@@ -40,6 +40,27 @@ impl MergeMethod {
     }
 }
 
+/// Pull request states at which a review request counts as resolved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolvedReviewState {
+    Merged,
+    Closed,
+    /// Open, with the reviews its branch protection requires.
+    Approved,
+}
+
+impl ResolvedReviewState {
+    /// The notification context the state is recorded as.
+    pub fn context(self) -> &'static str {
+        match self {
+            ResolvedReviewState::Merged => "merged",
+            ResolvedReviewState::Closed => "closed",
+            ResolvedReviewState::Approved => "approved",
+        }
+    }
+}
+
 /// Layout mode for the notification list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -229,6 +250,10 @@ pub struct Config {
     /// Exclude notifications whose title matches any of these regex patterns.
     #[serde(default)]
     pub exclude_subjects: Vec<String>,
+    /// Hide review requests on pull requests in any of these states. Empty
+    /// turns it off, and the states are then not fetched.
+    #[serde(default)]
+    pub hide_resolved_review_requests: Vec<ResolvedReviewState>,
 
     // GitHub Actions workflow run notifications (opt-in)
     /// Enable GitHub Actions workflow run notifications.
@@ -304,6 +329,7 @@ impl Default for Config {
             exclude_reasons: Vec::new(),
             exclude_repos: Vec::new(),
             exclude_subjects: Vec::new(),
+            hide_resolved_review_requests: Vec::new(),
             enable_actions: false,
             actions_failed_only: true,
             actions_repos: Vec::new(),
@@ -541,6 +567,21 @@ priority = 1
 "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.actions[0].priority, Some(1));
+    }
+
+    #[test]
+    fn test_parse_hide_resolved_review_requests() {
+        assert!(toml::from_str::<Config>("")
+            .unwrap()
+            .hide_resolved_review_requests
+            .is_empty());
+        let config: Config =
+            toml::from_str(r#"hide_resolved_review_requests = ["merged", "approved"]"#).unwrap();
+        assert_eq!(
+            config.hide_resolved_review_requests,
+            [ResolvedReviewState::Merged, ResolvedReviewState::Approved]
+        );
+        assert!(toml::from_str::<Config>(r#"hide_resolved_review_requests = ["mreged"]"#).is_err());
     }
 
     #[test]

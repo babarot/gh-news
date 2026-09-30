@@ -88,6 +88,13 @@ participating_only = false
 # exclude_repos = ["dependabot/*", "some-org/noisy-repo"]
 # exclude_subjects = ["\\[bot\\]", "^Bump ", "dependabot"]
 
+# Hide review requests on pull requests that no longer need your review:
+# "merged", "closed", or "approved" (open, with the reviews its branch
+# protection requires). The states are fetched on every refresh, one REST
+# call per open review request plus a GraphQL one for "approved".
+# Default: [] (off, nothing fetched)
+# hide_resolved_review_requests = ["merged", "closed", "approved"]
+
 # ==============================================================================
 # THEME
 # ==============================================================================

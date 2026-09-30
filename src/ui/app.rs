@@ -171,6 +171,44 @@ fn collect_successful_batch_result(
     }
 }
 
+/// A review request whose pull request state decides whether it is hidden.
+struct ReviewRequestItem {
+    id: String,
+    owner: String,
+    repo: String,
+    number: u64,
+}
+
+/// One GraphQL query for the state and review decision of many pull
+/// requests, aliased p0, p1, ... in the order given.
+fn review_states_query(items: &[ReviewRequestItem]) -> String {
+    let mut query = String::from("query {");
+    for (i, item) in items.iter().enumerate() {
+        query.push_str(&format!(
+            " p{i}: repository(owner: {}, name: {}) {{ pullRequest(number: {}) {{ state reviewDecision }} }}",
+            serde_json::Value::from(item.owner.as_str()),
+            serde_json::Value::from(item.repo.as_str()),
+            item.number,
+        ));
+    }
+    query.push_str(" }");
+    query
+}
+
+/// The context recorded for a pull request from `review_states_query`.
+fn review_state_context(pr: &serde_json::Value, approval_hides: bool) -> Option<&'static str> {
+    Some(match pr.get("state")?.as_str()? {
+        "MERGED" => "merged",
+        "CLOSED" => "closed",
+        _ if approval_hides
+            && pr.get("reviewDecision").and_then(|d| d.as_str()) == Some("APPROVED") =>
+        {
+            "approved"
+        }
+        _ => "open",
+    })
+}
+
 /// Results from the background enrichment thread that resolves author logins
 /// and subject state context for notifications.
 struct EnrichmentResult {
@@ -187,6 +225,7 @@ impl App {
         let palette = config.color_palette();
         let mut state = AppState::new();
         state.org_grouping = org_grouping;
+        state.hidden_review_states = config.hide_resolved_review_requests.clone();
         Self {
             state,
             config,
@@ -357,6 +396,7 @@ impl App {
 
         let mut app_state = AppState::new();
         app_state.org_grouping = self.config.org_grouping;
+        app_state.hidden_review_states = self.config.hide_resolved_review_requests.clone();
         app_state.views = crate::builtin_views::builtin_views()
             .into_iter()
             .chain(self.config.views.iter().cloned())
@@ -728,6 +768,33 @@ impl App {
             is_pr: bool,
         }
 
+        let hidden = &self.config.hide_resolved_review_requests;
+        let approval_hides = hidden.contains(&crate::config::ResolvedReviewState::Approved);
+        // A review request is checked again on every refresh until its pull
+        // request is merged or closed: others may approve it, or a new push
+        // may dismiss their approvals. They are batched into one GraphQL
+        // query per 50, since a call each would exceed the rate limit. Nothing
+        // is fetched when no state hides them.
+        let review_items: Vec<ReviewRequestItem> = self
+            .state
+            .notifications
+            .iter()
+            .filter(|n| {
+                !hidden.is_empty()
+                    && n.reason_enum() == NotificationReason::ReviewRequested
+                    && n.notification_type() == NotificationType::PullRequest
+                    && !matches!(n.context.as_deref(), Some("merged" | "closed"))
+            })
+            .filter_map(|n| {
+                let (owner, repo) = n.repo_full_name().split_once('/')?;
+                Some(ReviewRequestItem {
+                    id: n.id.clone(),
+                    owner: owner.to_string(),
+                    repo: repo.to_string(),
+                    number: n.subject_number()?.parse().ok()?,
+                })
+            })
+            .collect();
         let to_fetch: Vec<FetchItem> = self
             .state
             .notifications
@@ -760,7 +827,7 @@ impl App {
             })
             .collect();
 
-        if to_fetch.is_empty() {
+        if to_fetch.is_empty() && review_items.is_empty() {
             return;
         }
 
@@ -791,7 +858,7 @@ impl App {
                             }
                         }
 
-                        // Fetch subject state for state_change notifications
+                        // Fetch subject state for state changes and review requests
                         if let Some(url) = &item.subject_url {
                             if let Ok(value) = client.get_json_by_url(url) {
                                 let context = if item.is_pr {
@@ -845,6 +912,21 @@ impl App {
                         }
                     }
                 }));
+            }
+
+            for chunk in review_items.chunks(50) {
+                let Ok(data) = client.graphql(&review_states_query(chunk), serde_json::json!({}))
+                else {
+                    continue;
+                };
+                for (i, item) in chunk.iter().enumerate() {
+                    if let Some(context) = data
+                        .pointer(&format!("/data/p{i}/pullRequest"))
+                        .and_then(|pr| review_state_context(pr, approval_hides))
+                    {
+                        let _ = inner_tx.send((item.id.clone(), "context", context.to_string()));
+                    }
+                }
             }
             drop(inner_tx);
 
@@ -4512,6 +4594,49 @@ mod tests {
             RefreshStage::UpdateLocalState.loading_message()
         );
         assert_eq!(app.state.loading_progress, Some((6, 6)));
+    }
+
+    #[test]
+    fn review_states_query_aliases_each_pull_request() {
+        let item = |owner: &str, number: u64| ReviewRequestItem {
+            id: number.to_string(),
+            owner: owner.to_string(),
+            repo: "repo".to_string(),
+            number,
+        };
+        let query = review_states_query(&[item("a", 1), item("b", 2)]);
+        assert!(
+            query.contains(r#"p0: repository(owner: "a", name: "repo") { pullRequest(number: 1)"#)
+        );
+        assert!(
+            query.contains(r#"p1: repository(owner: "b", name: "repo") { pullRequest(number: 2)"#)
+        );
+    }
+
+    #[test]
+    fn review_state_context_maps_state_and_approval() {
+        let pr = |state: &str, decision: &str| serde_json::json!({ "state": state, "reviewDecision": decision });
+        assert_eq!(
+            review_state_context(&pr("MERGED", "APPROVED"), true),
+            Some("merged")
+        );
+        assert_eq!(
+            review_state_context(&pr("CLOSED", ""), true),
+            Some("closed")
+        );
+        assert_eq!(
+            review_state_context(&pr("OPEN", "APPROVED"), true),
+            Some("approved")
+        );
+        assert_eq!(
+            review_state_context(&pr("OPEN", "APPROVED"), false),
+            Some("open")
+        );
+        assert_eq!(
+            review_state_context(&pr("OPEN", "REVIEW_REQUIRED"), true),
+            Some("open")
+        );
+        assert_eq!(review_state_context(&serde_json::Value::Null, true), None);
     }
 
     #[test]
