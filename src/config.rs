@@ -208,6 +208,7 @@ pub struct Config {
     // Display defaults
     pub default_preview_mode: String,
     pub repos_collapsed: bool,
+    pub groups_collapsed: bool,
     pub org_grouping: OrgGroupingMode,
     pub list_layout: ListLayout,
 
@@ -312,6 +313,7 @@ impl Default for Config {
             theme_colors: None,
             default_preview_mode: "vertical".to_string(),
             repos_collapsed: false,
+            groups_collapsed: false,
             org_grouping: OrgGroupingMode::default(),
             list_layout: ListLayout::default(),
             auto_mark_read: false,
@@ -582,6 +584,13 @@ priority = 1
             [ResolvedReviewState::Merged, ResolvedReviewState::Approved]
         );
         assert!(toml::from_str::<Config>(r#"hide_resolved_review_requests = ["mreged"]"#).is_err());
+    }
+
+    #[test]
+    fn test_groups_collapsed_defaults_off() {
+        assert!(!toml::from_str::<Config>("").unwrap().groups_collapsed);
+        let config: Config = toml::from_str("groups_collapsed = true").unwrap();
+        assert!(config.groups_collapsed);
     }
 
     #[test]

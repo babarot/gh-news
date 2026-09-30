@@ -47,6 +47,7 @@ pub struct PendingStateSettings {
     pub filter_pattern: Option<String>,
     pub show_all: bool,
     pub repos_collapsed: bool,
+    pub groups_collapsed: bool,
     pub preview_mode: PreviewMode,
 }
 
@@ -389,6 +390,7 @@ impl App {
                 filter_pattern: None,
                 show_all: false,
                 repos_collapsed: self.config.repos_collapsed,
+                groups_collapsed: self.config.groups_collapsed,
                 preview_mode: self.config.get_default_preview_mode(),
             });
 
@@ -419,7 +421,9 @@ impl App {
             app_state.set_pinned_notifications(data.pinned_notifications);
         }
 
-        if settings.repos_collapsed {
+        if settings.groups_collapsed {
+            app_state.collapse_all_groups();
+        } else if settings.repos_collapsed {
             app_state.collapse_all_repos();
         }
 

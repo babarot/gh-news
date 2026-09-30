@@ -410,17 +410,22 @@ impl AppState {
         }
     }
 
+    /// Collapse every repository and owner header (no tree rebuild).
+    pub fn collapse_all_groups(&mut self) {
+        self.collapse_all_repos();
+        for n in &self.notifications {
+            self.expanded_orgs
+                .insert(n.repository.owner.login.clone(), false);
+        }
+    }
+
     /// Collapse or expand every repository and organisation at once.
     pub fn set_all_expanded(&mut self, expanded: bool) {
         if expanded {
             self.expanded_repos.clear();
             self.expanded_orgs.clear();
         } else {
-            self.collapse_all_repos();
-            for n in &self.notifications {
-                self.expanded_orgs
-                    .insert(n.repository.owner.login.clone(), false);
-            }
+            self.collapse_all_groups();
         }
         self.build_tree();
         if !self.tree_items.is_empty() {

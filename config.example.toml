@@ -153,6 +153,12 @@ default_preview_mode = "vertical"
 # CLI flag: (not available as flag, set via env or config)
 repos_collapsed = false
 
+# Start with every group collapsed, organisation and user headers too, as
+# after pressing H. Implies repos_collapsed.
+# Default: false
+# CLI flag: (not available as flag, set via env or config)
+groups_collapsed = false
+
 # Group notifications by organisation above repository grouping.
 # Options:
 #   - "off":    only group by repository

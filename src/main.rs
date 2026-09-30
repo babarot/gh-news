@@ -178,6 +178,7 @@ fn run() -> Result<()> {
         filter_pattern: opts.filter_pattern.clone(),
         show_all: opts.show_all,
         repos_collapsed: config.repos_collapsed,
+        groups_collapsed: config.groups_collapsed,
         preview_mode,
     };
 
